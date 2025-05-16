@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title></title>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f5f5f5;
+        }
+        
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 25px;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+        }
+        
+        .container {
+            background-color: white;
+            border-radius: 10px;
+            padding: 25px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        .file-input-wrapper {
+            margin: 20px 0;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: bold;
+            color: #2c3e50;
+            font-size: 16px;
+        }
+        
+        input[type="file"] {
+            width: 100%;
+            max-width: 300px;
+            margin: 0 auto;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background: white;
+            cursor: pointer;
+        }
+        
+        #previewImage {
+            max-width: 100%;
+            max-height: 350px;
+            margin: 20px auto;
+            display: none;
+            border-radius: 5px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border: 1px solid #eee;
+        }
+        
+        .controls {
+            margin: 25px 0;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s;
+            min-width: 120px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        button:hover {
+            background-color: #2980b9;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        button:disabled {
+            background-color: #bdc3c7;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        #statusMessage {
+            color: #7f8c8d;
+            margin: 20px 0;
+            min-height: 24px;
+            font-size: 15px;
+            padding: 10px;
+            border-radius: 5px;
+            background-color: #f8f9fa;
+        }
+        
+        .file-info {
+            font-size: 14px;
+            color: #7f8c8d;
+            margin-top: 5px;
+        }
+        
+        @media (max-width: 480px) {
+            .controls {
+                flex-direction: column;
+                align-items: center;
+            }
+            button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1></h1>
+    
+    <div class="container">
+        <div class="file-input-wrapper">
+            <label for="fileInput"></label>
+            <input type="file" id="fileInput" accept="image/jpeg, image/png" aria-describedby="fileHelp">
+            <div id="fileHelp" class="file-info"></div>
+        </div>
+        
+        <img id="previewImage" alt=" ">
+        
+        <div class="controls">
+            <button id="rotateLeftBtn" disabled aria-label=" ">
+                <span class="icon">↺</span> 
+            </button>
+            <button id="rotateRightBtn" disabled aria-label=" ">
+                <span class="icon">↻</span> 
+            </button>
+            <button id="downloadBtn" disabled aria-label=" ">
+                <span class="icon">⤓</span> 
+            </button>
+        </div>
+        
+        <div id="statusMessage"></div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const elements = {
+                fileInput: document.getElementById('fileInput'),
+                previewImage: document.getElementById('previewImage'),
+                rotateLeftBtn: document.getElementById('rotateLeftBtn'),
+                rotateRightBtn: document.getElementById('rotateRightBtn'),
+                downloadBtn: document.getElementById('downloadBtn'),
+                statusMessage: document.getElementById('statusMessage')
+            };
+            
+            const checkElements = () => {
+                for (const [key, element] of Object.entries(elements)) {
+                    if (!element) {
+                        console.error;
+                        return false;
+                    }
+                }
+                return true;
+            };
+            
+            if (!checkElements()) {
+                elements.statusMessage.textContent = ' ';
+                return;
+            }
+            
+            let rotation = 0;
+            let currentFile = null;
+            
+            elements.fileInput.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                currentFile = file;
+                
+                if (!file) {
+                    elements.statusMessage.textContent = ' ';
+                    return;
+                }
+                
+                if (!file.type.match('image/jpeg') && !file.type.match('image/png')) {
+                    elements.statusMessage.textContent = ' ';
+                    return;
+                }
+                
+                if (file.size > 5 * 1024 * 1024) {
+                    elements.statusMessage.textContent = ' ';
+                    return;
+                }
+                
+                elements.statusMessage.textContent = ' ';
+                const reader = new FileReader();
+                
+                reader.onload = function(event) {
+                    elements.previewImage.src = event.target.result;
+                    elements.previewImage.style.display = 'block';
+                    rotation = 0;
+                    
+                    elements.previewImage.onload = function() {
+                        elements.statusMessage.textContent = ` ${file.name}`;
+                        enableAllButtons();
+                    };
+                    
+                    elements.previewImage.onerror = function() {
+                        elements.statusMessage.textContent = ' ';
+                        disableAllButtons();
+                    };
+                };
+                
+                reader.onerror = function() {
+                    elements.statusMessage.textContent = ' ';
+                    disableAllButtons();
+                };
+                
+                reader.readAsDataURL(file);
+            });
+            
+            elements.rotateLeftBtn.addEventListener('click', function() {
+                rotation -= 90;
+                updateImageRotation();
+            });
+            
+            elements.rotateRightBtn.addEventListener('click', function() {
+                rotation += 90;
+                updateImageRotation();
+            });
+            
+            elements.downloadBtn.addEventListener('click', function() {
+                if (!elements.previewImage.src) {
+                    elements.statusMessage.textContent = '';
+                    return;
+                }
+                
+                elements.statusMessage.textContent = ' ';
+                
+                setTimeout(() => {
+                    try {
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        
+                        if (Math.abs(rotation) % 180 === 0) {
+                            canvas.width = elements.previewImage.naturalWidth;
+                            canvas.height = elements.previewImage.naturalHeight;
+                        } else {
+                            canvas.width = elements.previewImage.naturalHeight;
+                            canvas.height = elements.previewImage.naturalWidth;
+                        }
+                        
+                        ctx.translate(canvas.width / 2, canvas.height / 2);
+                        ctx.rotate(rotation * Math.PI / 180);
+                        ctx.drawImage(
+                            elements.previewImage,
+                            -elements.previewImage.naturalWidth / 2,
+                            -elements.previewImage.naturalHeight / 2,
+                            elements.previewImage.naturalWidth,
+                            elements.previewImage.naturalHeight
+                        );
+                        
+                        const link = document.createElement('a');
+                        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                        const fileName = currentFile ? currentFile.name.replace(/\.[^/.]+$/, '') : 'image';
+                        link.download = `${fileName}-rotated-${timestamp}.png`;
+                        link.href = canvas.toDataURL('image/png');
+                        link.click();
+                        
+                        elements.statusMessage.textContent = ' ';
+                    } catch (error) {
+                        console.error(' ', error);
+                        elements.statusMessage.textContent = ' ' + error.message;
+                    }
+                }, 100);
+            });
+            
+            function updateImageRotation() {
+                elements.previewImage.style.transform = `rotate(${rotation}deg)`;
+                elements.statusMessage.textContent = ` ${rotation}°`;
+            }
+            
+            function enableAllButtons() {
+                elements.rotateLeftBtn.disabled = false;
+                elements.rotateRightBtn.disabled = false;
+                elements.downloadBtn.disabled = false;
+            }
+            
+            function disableAllButtons() {
+                elements.rotateLeftBtn.disabled = true;
+                elements.rotateRightBtn.disabled = true;
+                elements.downloadBtn.disabled = true;
+            }
+        });
+    </script>
+</body>
+</html>
