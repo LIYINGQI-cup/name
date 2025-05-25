@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "Microsoft YaHei", sans-serif;
+        }
+        
+        body {
+            background-color: #f5f5f5;
+            color: #333;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        
+        p {
+            color: #7f8c8d;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .control-panel {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .control-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 14px;
+            color: #555;
+        }
+        
+        button {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+            transition: all 0.3s;
+        }
+        
+        .primary-btn {
+            background-color: #3498db;
+            color: white;
+        }
+        
+        .primary-btn:hover {
+            background-color: #2980b9;
+        }
+        
+        .secondary-btn {
+            background-color: #ecf0f1;
+            color: #7f8c8d;
+        }
+        
+        .secondary-btn:hover {
+            background-color: #ddd;
+        }
+        
+        input[type="range"] {
+            width: 150px;
+            height: 8px;
+            border-radius: 4px;
+            background-color: #eee;
+            appearance: none;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background-color: #3498db;
+            cursor: pointer;
+        }
+        
+        .image-container {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 20px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        .image-card {
+            text-align: center;
+        }
+        
+        h2 {
+            color: #3498db;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        canvas {
+            border: 1px solid #eee;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+        }
+        
+        .status {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #7f8c8d;
+        }
+    </style>
+</head>
+<body>
+      
+
+    <div class="container">
+        <div class="control-panel">
+            <div class="control-group">
+                <label for="threshold">threshold</label>
+                <input type="range" id="threshold" min="0" max="255" value="128">
+                <span id="threshold-value">128</span>
+            </div>
+            
+            <div class="control-group">
+                <label for="mode">mode</label>
+                <select id="mode">
+                    <option value="binary">binary</option>
+                    <option value="grayscale">grayscale</option>
+                    <option value="invert">invert</option>
+                </select>
+            </div>
+            
+            <button id="upload-btn" class="primary-btn">
+                <i class="fa fa-upload"></i> uppload images
+            </button>
+            
+        
+        <div class="image-container">
+            <div class="image-card">
+                <h2>original image</h2>
+                <canvas id="original-canvas" width="400" height="300"></canvas>
+            </div>
+            
+            <div class="image-card">
+                <h2>divide the result</h2>
+                <canvas id="result-canvas" width="400" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        const uploadBtn = document.getElementById('upload-btn');
+        const processBtn = document.getElementById('process-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const thresholdInput = document.getElementById('threshold');
+        const thresholdValue = document.getElementById('threshold-value');
+        const modeSelect = document.getElementById('mode');
+        const status = document.getElementById('status');
+        const originalCanvas = document.getElementById('original-canvas');
+        const resultCanvas = document.getElementById('result-canvas');
+        const originalPlaceholder = document.getElementById('original-placeholder');
+        const resultPlaceholder = document.getElementById('result-placeholder');
+        
+        const originalCtx = originalCanvas.getContext('2d');
+        const resultCtx = resultCanvas.getContext('2d');
+        
+        let uploadedImage = null;
+        
+        init();
+        
+        function init() {
+            thresholdValue.textContent = thresholdInput.value;
+            
+            thresholdInput.addEventListener('input', () => {
+                thresholdValue.textContent = thresholdInput.value;
+                if (uploadedImage) {
+                    processImage(); 
+                }
+            });
+            
+            modeSelect.addEventListener('change', () => {
+                if (uploadedImage) {
+                    processImage(); 
+                }
+            });
+            
+            uploadBtn.addEventListener('click', handleImageUpload);
+            processBtn.addEventListener('click', processImage);
+            resetBtn.addEventListener('click', resetAll);
+            
+          
+        }
+        
+        function handleImageUpload() {
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.accept = 'image/*';
+            
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files && e.target.files[0]) {
+                    const file = e.target.files[0];
+                    if (file.type.startsWith('image/')) {
+                        const reader = new FileReader();
+                        reader.onload = (event) => {
+                            uploadedImage = new Image();
+                            uploadedImage.onload = () => {
+                                drawImage(originalCtx, uploadedImage, originalPlaceholder);
+                                
+                              
+                            };
+                            uploadedImage.src = event.target.result;
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                }
+            });
+            
+            fileInput.click();
+        }
+        
+        function drawImage(ctx, image, placeholder) {
+            ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+            
+            const canvasWidth = ctx.canvas.width;
+            const canvasHeight = ctx.canvas.height;
+            const imageWidth = image.width;
+            const imageHeight = image.height;
+            
+            let scaleX = canvasWidth / imageWidth;
+            let scaleY = canvasHeight / imageHeight;
+            let scale = Math.min(scaleX, scaleY);
+            
+            const scaledWidth = imageWidth * scale;
+            const scaledHeight = imageHeight * scale;
+            const offsetX = (canvasWidth - scaledWidth) / 2;
+            const offsetY = (canvasHeight - scaledHeight) / 2;
+            
+            ctx.drawImage(
+                image, 
+                0, 0, imageWidth, imageHeight,
+                offsetX, offsetY, scaledWidth, scaledHeight
+            );
+            
+            placeholder.style.display = 'none';
+        }
+        
+        function drawPlaceholder(ctx, placeholderElement, text) {
+            ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+            
+            ctx.fillStyle = '#f9f9f9';
+            ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+            
+            ctx.fillStyle = '#ddd';
+            ctx.font = '30px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('📷', ctx.canvas.width / 2, ctx.canvas.height / 2 - 30);
+            
+            ctx.fillStyle = '#7f8c8d';
+            ctx.font = '14px Arial';
+            ctx.fillText(text, ctx.canvas.width / 2, ctx.canvas.height / 2 + 10);
+            
+            placeholderElement.style.display = 'block';
+        }
+        
+        function processImage() {
+            if (!uploadedImage) {
+                status.textContent = " ";
+                return;
+            }
+            
+            const mode = modeSelect.value;
+            const threshold = parseInt(thresholdInput.value);
+            
+            resultCtx.clearRect(0, 0, resultCanvas.width, resultCanvas.height);
+            
+            const canvasWidth = resultCanvas.width;
+            const canvasHeight = resultCanvas.height;
+            const imageWidth = uploadedImage.width;
+            const imageHeight = uploadedImage.height;
+            
+            let scaleX = canvasWidth / imageWidth;
+            let scaleY = canvasHeight / imageHeight;
+            let scale = Math.min(scaleX, scaleY);
+            
+            const scaledWidth = imageWidth * scale;
+            const scaledHeight = imageHeight * scale;
+            const offsetX = (canvasWidth - scaledWidth) / 2;
+            const offsetY = (canvasHeight - scaledHeight) / 2;
+            
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCanvas.width = imageWidth;
+            tempCanvas.height = imageHeight;
+            tempCtx.drawImage(uploadedImage, 0, 0, imageWidth, imageHeight);
+            
+            const imgData = tempCtx.getImageData(0, 0, imageWidth, imageHeight);
+            const data = imgData.data;
+            
+            if (mode === 'binary') {
+                for (let i = 0; i < data.length; i += 4) {
+                    const avg = (data[i] + data[i+1] + data[i+2]) / 3; 
+                    if (avg > threshold) {
+                        data[i] = 255;     
+                        data[i+1] = 255;   
+                        data[i+2] = 255;   
+                    } else {
+                        data[i] = 0;       
+                        data[i+1] = 0;     
+                        data[i+2] = 0;     
+                    }
+                    data[i+3] = 255;    
+                }
+            } else if (mode === 'grayscale') {
+                for (let i = 0; i < data.length; i += 4) {
+                    const gray = (data[i] * 0.3 + data[i+1] * 0.59 + data[i+2] * 0.11); 
+                    data[i] = gray;     
+                    data[i+1] = gray;   
+                    data[i+2] = gray;   
+                    data[i+3] = 255;    
+                }
+            } else if (mode === 'invert') {
+                for (let i = 0; i < data.length; i += 4) {
+                    data[i] = 255 - data[i];     
+                    data[i+1] = 255 - data[i+1]; 
+                    data[i+2] = 255 - data[i+2]; 
+                    data[i+3] = 255;            
+                }
+            }
+            
+            tempCtx.putImageData(imgData, 0, 0);
+            resultCtx.drawImage(
+                tempCanvas, 
+                0, 0, imageWidth, imageHeight,
+                offsetX, offsetY, scaledWidth, scaledHeight
+            );
+             
+        }
+      
+    </script>
+</body>
+</html>
