@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+
+        body {
+            background-color: #f4f4f4;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .control-panel {
+            background-color: white;
+            border-radius: 5px;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+            width: 100%;
+            max-width: 600px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        label {
+            margin-bottom: 5px;
+            color: #555;
+        }
+
+        select {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+        }
+
+        input[type="range"] {
+            width: 200px;
+            margin: 0 10px;
+        }
+
+        button {
+            padding: 8px 15px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+
+        .image-container {
+            display: flex;
+            gap: 20px;
+        }
+
+        .image-card {
+            text-align: center;
+            background-color: white;
+            border-radius: 5px;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+            padding: 10px;
+            width: 300px;
+            height: 300px;
+        }
+
+        canvas {
+            border: 1px solid #ccc;
+            background-color: #f9f9f9;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="control-panel">
+        <div>
+            <label for="mask-type">type</label>
+            <select id="mask-type">
+                <option value="blur">blur</option>
+            </select>
+        </div>
+        <div>
+            <label for="blur-level">level</label>
+            <input type="range" id="blur-level" min="1" max="10" value="5">
+            <span id="blur-value">5</span>
+        </div>
+        <button id="upload-btn">upload</button>
+        <button id="process-btn" disabled>process</button>
+    </div>
+    <div class="image-container">
+        <div class="image-card">
+            <h2>image</h2>
+            <canvas id="original-canvas" width="300" height="300"></canvas>
+            <p id="original-placeholder"></p >
+        </div>
+        <div class="image-card">
+            <h2>after processing</h2>
+            <canvas id="processed-canvas" width="300" height="300"></canvas>
+            <p id="processed-placeholder"></p >
+        </div>
+    </div>
+
+    <script>
+        const uploadBtn = document.getElementById('upload-btn');
+        const processBtn = document.getElementById('process-btn');
+        const maskTypeSelect = document.getElementById('mask-type');
+        const blurLevelInput = document.getElementById('blur-level');
+        const blurValueSpan = document.getElementById('blur-value');
+        const originalCanvas = document.getElementById('original-canvas');
+        const processedCanvas = document.getElementById('processed-canvas');
+        const originalPlaceholder = document.getElementById('original-placeholder');
+        const processedPlaceholder = document.getElementById('processed-placeholder');
+
+        const originalCtx = originalCanvas.getContext('2d');
+        const processedCtx = processedCanvas.getContext('2d');
+
+        let uploadedImage = null;
+
+        init();
+
+        function init() {
+            blurLevelInput.addEventListener('input', () => {
+                blurValueSpan.textContent = blurLevelInput.value;
+            });
+
+            uploadBtn.addEventListener('click', handleImageUpload);
+
+            processBtn.addEventListener('click', processImage);
+           
+        }
+
+        function handleImageUpload() {
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.accept = 'image/*';
+
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files && e.target.files[0]) {
+                    const file = e.target.files[0];
+                    if (file.type.startsWith('image/')) {
+                        const reader = new FileReader();
+                        reader.onload = (event) => {
+                            uploadedImage = new Image();
+                            uploadedImage.onload = () => {
+                                drawImage(originalCtx, uploadedImage, originalPlaceholder);
+                                processBtn.disabled = false;
+                            };
+                            uploadedImage.src = event.target.result;
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                }
+            });
+
+            fileInput.click();
+        }
+
+        function drawImage(ctx, image, placeholder) {
+            ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+            ctx.drawImage(image, 0, 0, ctx.canvas.width, ctx.canvas.height);
+            placeholder.style.display = 'none';
+        }
+
+        function drawPlaceholder(ctx, placeholderElement, text) {
+            ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+            ctx.fillStyle = '#f9f9f9';
+            ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+            ctx.fillStyle = '#ccc';
+            ctx.font = '18px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, ctx.canvas.width / 2, ctx.canvas.height / 2);
+            placeholderElement.style.display = 'block';
+        }
+
+        function processImage() {
+            if (!uploadedImage) return;
+
+            processedCtx.clearRect(0, 0, processedCanvas.width, processedCanvas.height);
+
+            drawImage(processedCtx, uploadedImage, processedPlaceholder);
+
+            const maskType = maskTypeSelect.value;
+            const blurLevel = parseInt(blurLevelInput.value);
+
+            if (maskType === 'blur') {
+                applyBlurEffect(blurLevel);
+            }
+        }
+
+        function applyBlurEffect(level) {
+            const imageData = processedCtx.getImageData(0, 0, processedCanvas.width, processedCanvas.height);
+            const data = imageData.data;
+            const radius = level;
+
+            const newData = new Uint8ClampedArray(data.length);
+
+            for (let y = 0; y < processedCanvas.height; y++) {
+                for (let x = 0; x < processedCanvas.width; x++) {
+                    let rSum = 0;
+                    let gSum = 0;
+                    let bSum = 0;
+                    let aSum = 0;
+                    let count = 0;
+
+                    for (let dy = -radius; dy <= radius; dy++) {
+                        for (let dx = -radius; dx <= radius; dx++) {
+                            const nx = x + dx;
+                            const ny = y + dy;
+                            if (nx >= 0 && nx < processedCanvas.width && ny >= 0 && ny < processedCanvas.height) {
+                                const index = (ny * processedCanvas.width + nx) * 4;
+                                rSum += data[index];
+                                gSum += data[index + 1];
+                                bSum += data[index + 2];
+                                aSum += data[index + 3];
+                                count++;
+                            }
+                        }
+                    }
+
+                    const index = (y * processedCanvas.width + x) * 4;
+                    newData[index] = rSum / count;
+                    newData[index + 1] = gSum / count;
+                    newData[index + 2] = bSum / count;
+                    newData[index + 3] = aSum / count;
+                }
+            }
+
+            imageData.data.set(newData);
+            processedCtx.putImageData(imageData, 0, 0);
+        }
+    </script>
+</body>
+
+</html>
