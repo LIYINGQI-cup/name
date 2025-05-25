@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Broken line drawing and spline interpolation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "Microsoft YaHei", sans-serif;
+        }
+        
+        body {
+            background-color: #f5f5f5;
+            color: #333;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        
+        p {
+            color: #7f8c8d;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .control-panel {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .control-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 14px;
+            color: #555;
+        }
+        
+        button {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+            transition: all 0.3s;
+        }
+        
+        .primary-btn {
+            background-color: #3498db;
+            color: white;
+        }
+        
+        .primary-btn:hover {
+            background-color: #2980b9;
+        }
+        
+        .secondary-btn {
+            background-color: #ecf0f1;
+            color: #7f8c8d;
+        }
+        
+        .secondary-btn:hover {
+            background-color: #ddd;
+        }
+        
+        input[type="range"] {
+            width: 150px;
+            height: 8px;
+            border-radius: 4px;
+            background-color: #eee;
+            appearance: none;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background-color: #3498db;
+            cursor: pointer;
+        }
+        
+        .canvas-container {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 20px;
+            position: relative;
+        }
+        
+        canvas {
+            border: 1px solid #eee;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+        }
+        
+        .status {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #7f8c8d;
+        }
+    
+        .point-marker {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: #3498db;
+            border: 2px solid white;
+            box-shadow: 0 0 5px rgba(0,0,0,0.2);
+            cursor: pointer;
+            z-index: 10;
+        }
+        
+        .point-marker:hover {
+            transform: scale(1.2);
+        }
+        
+        .point-label {
+            position: absolute;
+            font-size: 12px;
+            color: #333;
+            background-color: white;
+            padding: 2px 5px;
+            border-radius: 4px;
+            box-shadow: 0 0 5px rgba(0,0,0,0.2);
+            z-index: 11;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Broken line drawing and spline interpolation</h1>
+        <p></p >
+    </header>
+
+    <div class="container">
+        <div class="control-panel">
+            <div class="control-group">
+                <label for="mode">mode</label>
+                <select id="mode">
+                    <option value="line">line</option>
+                    <option value="spline">spline</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <label for="point-color">point-color</label>
+                <input type="color" id="point-color" value="#3498db">
+            </div>
+            
+            <div class="control-group">
+                <label for="line-color">line-color</label>
+                <input type="color" id="line-color" value="#2ecc71">
+            </div>
+            
+            <div class="control-group">
+                <label for="line-width">line-width</label>
+                <input type="range" id="line-width" min="1" max="5" value="2">
+                <span id="line-width-value">2</span>
+            </div>
+            
+            <div class="control-group">
+                <label for="spline-tension">spline-tension</label>
+                <input type="range" id="spline-tension" min="0" max="1" step="0.1" value="0.5">
+                <span id="spline-tension-value">0.5</span>
+            </div>
+            
+            <button id="add-point-btn" class="primary-btn">
+                <i class="fa fa-plus"></i> fa fa-plus
+            </button>
+            
+            <button id="clear-btn" class="secondary-btn">
+                <i class="fa fa-trash"></i> fa fa-trash
+            </button>
+            
+            <div class="status" id="status">
+                status
+            </div>
+        </div>
+        
+        <div class="canvas-container">
+            <canvas id="drawing-canvas" width="800" height="400"></canvas>
+        </div>
+    </div>
+
+    <footer style="text-align: center; margin-top: 40px; color: #7f8c8d; font-size: 14px;">
+    </footer>
+
+    <script>
+        const canvas = document.getElementById('drawing-canvas');
+        const ctx = canvas.getContext('2d');
+        const modeSelect = document.getElementById('mode');
+        const pointColorInput = document.getElementById('point-color');
+        const lineColorInput = document.getElementById('line-color');
+        const lineWidthInput = document.getElementById('line-width');
+        const lineWidthValue = document.getElementById('line-width-value');
+        const splineTensionInput = document.getElementById('spline-tension');
+        const splineTensionValue = document.getElementById('spline-tension-value');
+        const addPointBtn = document.getElementById('add-point-btn');
+        const clearBtn = document.getElementById('clear-btn');
+        const status = document.getElementById('status');
+        
+        let points = [];         
+        let isDrawing = false;   
+        let activePoint = null;  
+        let dragOffsetX = 0;     
+        let dragOffsetY = 0;     
+        
+        init();
+        
+        function init() {
+            lineWidthValue.textContent = lineWidthInput.value;
+            splineTensionValue.textContent = splineTensionInput.value;
+            
+            lineWidthInput.addEventListener('input', () => {
+                lineWidthValue.textContent = lineWidthInput.value;
+                draw();
+            });
+            
+            splineTensionInput.addEventListener('input', () => {
+                splineTensionValue.textContent = splineTensionInput.value;
+                if (modeSelect.value === 'spline') {
+                    draw();
+                }
+            });
+            
+            addPointBtn.addEventListener('click', addRandomPoint);
+            clearBtn.addEventListener('click', clearAll);
+            
+            canvas.addEventListener('click', (e) => {
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                addPoint(x, y);
+            });
+            
+            canvas.addEventListener('mousedown', (e) => {
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                for (let i = 0; i < points.length; i++) {
+                    const dx = x - points[i].x;
+                    const dy = y - points[i].y;
+                    if (dx * dx + dy * dy < 100) { 
+                        activePoint = i;
+                        dragOffsetX = x - points[i].x;
+                        dragOffsetY = y - points[i].y;
+                        isDrawing = true;
+                        draw();
+                        break;
+                    }
+                }
+            });
+            
+            document.addEventListener('mousemove', (e) => {
+                if (!isDrawing || activePoint === null) return;
+                
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                points[activePoint].x = x - dragOffsetX;
+                points[activePoint].y = y - dragOffsetY;
+                draw();
+            });
+            
+            document.addEventListener('mouseup', () => {
+                isDrawing = false;
+                activePoint = null;
+            });
+            
+            modeSelect.addEventListener('change', draw);
+            
+            pointColorInput.addEventListener('change', draw);
+            lineColorInput.addEventListener('change', draw);
+            
+            draw();
+        }
+        
+        function addPoint(x, y) {
+            points.push({ x, y });
+            status.textContent = `已添加 ${points.length} 个点 - 点击画布继续添加或拖动点调整位置`;
+            draw();
+        }
+        
+        function addRandomPoint() {
+            const x = Math.random() * canvas.width;
+            const y = Math.random() * canvas.height;
+            addPoint(x, y);
+        }
+        
+        function clearAll() {
+            points = [];
+            activePoint = null;
+            isDrawing = false;
+            status.textContent = '点击画布添加点';
+            draw();
+        }
+        
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            if (points.length > 0) {
+                drawPoints();
+                
+                if (modeSelect.value === 'line') {
+                    drawLine();
+                } else if (modeSelect.value === 'spline') {
+                    drawSpline();
+                }
+            }
+        }
+        
+        function drawPoints() {
+            const pointColor = pointColorInput.value;
+            ctx.fillStyle = pointColor;
+            
+            points.forEach((point, index) => {
+                ctx.beginPath();
+                ctx.arc(point.x, point.y, 6, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.fillStyle = '#fff';
+                ctx.font = '12px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(index.toString(), point.x, point.y);
+            });
+        }
+        
+        function drawLine() {
+            const lineColor = lineColorInput.value;
+            const lineWidth = lineWidthInput.value;
+            
+            ctx.strokeStyle = lineColor;
+            ctx.lineWidth = lineWidth;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            
+            ctx.beginPath();
+            ctx.moveTo(points[0].x, points[0].y);
+            
+            for (let i = 1; i < points.length; i++) {
+                ctx.lineTo(points[i].x, points[i].y);
+            }
+            
+            ctx.stroke();
+        }
+        
+        function drawSpline() {
+            const lineColor = lineColorInput.value;
+            const lineWidth = lineWidthInput.value;
+            const tension = parseFloat(splineTensionInput.value);
+            
+            ctx.strokeStyle = lineColor;
+            ctx.lineWidth = lineWidth;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            
+            if (points.length < 3) {
+                if (points.length === 2) {
+                    ctx.beginPath();
+                    ctx.moveTo(points[0].x, points[0].y);
+                    ctx.lineTo(points[1].x, points[1].y);
+                    ctx.stroke();
+                }
+                return;
+            }
+            
+            ctx.beginPath();
+            ctx.moveTo(points[0].x, points[0].y);
+            
+            for (let i = 1; i < points.length - 1; i++) {
+                const p0 = i > 0 ? points[i-1] : points[i];
+                const p1 = points[i];
+                const p2 = points[i+1];
+                const p3 = i < points.length - 2 ? points[i+2] : points[i+1];
+                
+                drawSplineSegment(ctx, p0, p1, p2, p3, tension);
+            }
+            
+            ctx.stroke();
+        }
+                function drawSplineSegment(ctx, p0, p1, p2, p3, tension) {
+            const t = tension;
+            const c1 = p1.x + (p2.x - p0.x) * t / 6;
+            const c2 = p2.x - (p3.x - p1.x) * t / 6;
+            const d1 = p1.y + (p2.y - p0.y) * t / 6;
+            const d2 = p2.y - (p3.y - p1.y) * t / 6;
+            
+            ctx.bezierCurveTo(c1, d1, c2, d2, p2.x, p2.y);
+        }
+    </script>
+</body>
+</html>
