@@ -3,7 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Broken line drawing and spline interpolation</title>
     <style>
         * {
             margin: 0;
@@ -160,11 +159,7 @@
     </style>
 </head>
 <body>
-    <header>
-        <h1>Broken line drawing and spline interpolation</h1>
-        <p></p >
-    </header>
-
+   
     <div class="container">
         <div class="control-panel">
             <div class="control-group">
@@ -198,15 +193,15 @@
             </div>
             
             <button id="add-point-btn" class="primary-btn">
-                <i class="fa fa-plus"></i> fa fa-plus
+                <i class="fa fa-plus"></i> add points
             </button>
             
             <button id="clear-btn" class="secondary-btn">
-                <i class="fa fa-trash"></i> fa fa-trash
+                <i class="fa fa-trash"></i> clear all
             </button>
             
             <div class="status" id="status">
-                status
+                click the canvas to add
             </div>
         </div>
         
@@ -312,7 +307,7 @@
         
         function addPoint(x, y) {
             points.push({ x, y });
-            status.textContent = `已添加 ${points.length} 个点 - 点击画布继续添加或拖动点调整位置`;
+            status.textContent = `add ${points.length} points`;
             draw();
         }
         
@@ -326,7 +321,7 @@
             points = [];
             activePoint = null;
             isDrawing = false;
-            status.textContent = '点击画布添加点';
+            status.textContent = ' ';
             draw();
         }
         
